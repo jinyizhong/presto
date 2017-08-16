@@ -119,6 +119,9 @@ public class ClientOptions
     @Option(name = "--client-request-timeout", title = "client request timeout", description = "Client request timeout (default: 2m)")
     public Duration clientRequestTimeout = new Duration(2, MINUTES);
 
+    @Option(name = "--exit-on-error", title = "exit-on-error", description = "exit when any query from --execute or --file failed and return -1")
+    public boolean exitOnErr;
+
     public enum OutputFormat
     {
         ALIGNED,

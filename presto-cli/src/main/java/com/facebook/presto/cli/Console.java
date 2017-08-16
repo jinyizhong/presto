@@ -141,7 +141,7 @@ public class Console
                 !clientOptions.krb5DisableRemoteServiceHostnameCanonicalization,
                 clientOptions.authenticationEnabled)) {
             if (hasQuery) {
-                executeCommand(queryRunner, query, clientOptions.outputFormat);
+                executeCommand(queryRunner, query, clientOptions.outputFormat, clientOptions.exitOnErr);
             }
             else {
                 runConsole(queryRunner, session, exiting);
@@ -171,7 +171,7 @@ public class Console
     private static void runConsole(QueryRunner queryRunner, ClientSession session, AtomicBoolean exiting)
     {
         try (TableNameCompleter tableNameCompleter = new TableNameCompleter(queryRunner);
-                LineReader reader = new LineReader(getHistory(), commandCompleter(), lowerCaseCommandCompleter(), tableNameCompleter)) {
+             LineReader reader = new LineReader(getHistory(), commandCompleter(), lowerCaseCommandCompleter(), tableNameCompleter)) {
             tableNameCompleter.populateCache();
             StringBuilder buffer = new StringBuilder();
             while (!exiting.get()) {
@@ -258,7 +258,7 @@ public class Console
                             outputFormat = OutputFormat.VERTICAL;
                         }
 
-                        process(queryRunner, split.statement(), outputFormat, true);
+                        process(queryRunner, split.statement(), outputFormat, true, false);
                     }
                     reader.getHistory().add(squeezeStatement(split.statement()) + split.terminator());
                 }
@@ -302,12 +302,12 @@ public class Console
         return statement instanceof Use;
     }
 
-    private static void executeCommand(QueryRunner queryRunner, String query, OutputFormat outputFormat)
+    private static void executeCommand(QueryRunner queryRunner, String query, OutputFormat outputFormat, boolean exitOnErr)
     {
         StatementSplitter splitter = new StatementSplitter(query);
         for (Statement split : splitter.getCompleteStatements()) {
             if (!isEmptyStatement(split.statement())) {
-                process(queryRunner, split.statement(), outputFormat, false);
+                process(queryRunner, split.statement(), outputFormat, false, exitOnErr);
             }
         }
         if (!isEmptyStatement(splitter.getPartialStatement())) {
@@ -315,7 +315,7 @@ public class Console
         }
     }
 
-    private static void process(QueryRunner queryRunner, String sql, OutputFormat outputFormat, boolean interactive)
+    private static void process(QueryRunner queryRunner, String sql, OutputFormat outputFormat, boolean interactive, boolean exitOnErr)
     {
         String finalSql;
         try {
@@ -333,7 +333,7 @@ public class Console
         }
 
         try (Query query = queryRunner.startQuery(finalSql)) {
-            query.renderOutput(System.out, outputFormat, interactive);
+            boolean isQuerySuccess = query.renderOutput(System.out, outputFormat, interactive);
 
             ClientSession session = queryRunner.getSession();
 
@@ -362,11 +362,20 @@ public class Console
             }
 
             queryRunner.setSession(session);
+
+            // 执行失败退出, 返回值1
+            if (!isQuerySuccess && !interactive && exitOnErr) {
+                System.exit(1);
+            }
         }
         catch (RuntimeException e) {
             System.err.println("Error running command: " + e.getMessage());
             if (queryRunner.getSession().isDebug()) {
                 e.printStackTrace();
+            }
+            // 异常失败退出, 返回值-1
+            if (!interactive && exitOnErr) {
+                System.exit(-1);
             }
         }
     }
