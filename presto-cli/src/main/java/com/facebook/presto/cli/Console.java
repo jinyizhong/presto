@@ -305,13 +305,17 @@ public class Console
     private static void executeCommand(QueryRunner queryRunner, String query, OutputFormat outputFormat, boolean exitOnErr)
     {
         StatementSplitter splitter = new StatementSplitter(query);
+        if (!isEmptyStatement(splitter.getPartialStatement())) {
+            System.err.println("Non-terminated statement: " + splitter.getPartialStatement());
+            // SQL没有终结退出, 返回值1
+            if (exitOnErr) {
+                System.exit(1);
+            }
+        }
         for (Statement split : splitter.getCompleteStatements()) {
             if (!isEmptyStatement(split.statement())) {
                 process(queryRunner, split.statement(), outputFormat, false, exitOnErr);
             }
-        }
-        if (!isEmptyStatement(splitter.getPartialStatement())) {
-            System.err.println("Non-terminated statement: " + splitter.getPartialStatement());
         }
     }
 
